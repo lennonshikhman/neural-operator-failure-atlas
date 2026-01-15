@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+import random
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.optim import Adam
@@ -21,6 +23,14 @@ from torch.optim import Adam
 from data import is_time_dependent
 from operators import make_fno
 
+def set_seed(seed: int):
+    torch.use_deterministic_algorithms(True)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 # ============================================================
 # Utilities
@@ -58,6 +68,7 @@ def train(
     lr: float = 1e-3,
     device: torch.device | None = None,
     log_every: int = 100,
+    seed: int = 0
 ):
     """
     Train a neural operator with MSE loss.
@@ -70,6 +81,9 @@ def train(
         device: torch.device (auto-detect if None)
         log_every: print loss every this many steps
     """
+    
+    set_seed(seed)
+    
     if device is None:
         device = get_device()
 

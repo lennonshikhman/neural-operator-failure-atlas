@@ -13,6 +13,83 @@ from __future__ import annotations
 import numpy as np
 import matplotlib.pyplot as plt
 
+def _finalize_plot(savepath=None):
+    plt.tight_layout()
+    if savepath is not None:
+        plt.savefig(savepath)
+        plt.close()
+    else:
+        plt.show()
+
+def plot_spectral_error(evaluation, title=None, savepath=None):
+    """
+    Plot spectral error curve for a single evaluation output.
+
+    Args:
+        evaluation: output dict from eval.py containing "spectral"
+        title: optional plot title
+        savepath: if provided, save figure to this path instead of showing
+    """
+    if not _has_spectral(evaluation):
+        raise ValueError("No spectral data present.")
+
+    set_plot_style()
+    spec = evaluation["spectral"]
+
+    plt.figure()
+    if "freqs" in spec:
+        plt.plot(spec["freqs"], spec["errors"], marker="o")
+        plt.xlabel("Frequency")
+    else:
+        plt.plot(spec["radii"], spec["errors"], marker="o")
+        plt.xlabel("Radial frequency")
+
+    plt.ylabel("Relative spectral error")
+    if title:
+        plt.title(title)
+
+    _finalize_plot(savepath)
+
+def plot_resolution_vs_spectral_energy(results, title=None, savepath=None):
+    set_plot_style()
+
+    resolutions = results["resolutions"]
+    low_err, high_err = [], []
+
+    for e in results["errors"]:
+        if not _has_spectral(e):
+            continue
+        spec = e["spectral"]["errors"]
+        mid = len(spec) // 2
+        low_err.append(np.mean(spec[:mid]))
+        high_err.append(np.mean(spec[mid:]))
+
+    plt.figure()
+    plt.plot(resolutions[:len(low_err)], low_err, marker="o", label="Low-frequency error")
+    plt.plot(resolutions[:len(high_err)], high_err, marker="o", label="High-frequency error")
+    plt.xlabel("Spatial resolution")
+    plt.ylabel("Relative spectral error")
+    plt.legend()
+    if title:
+        plt.title(title)
+
+    _finalize_plot(savepath)
+
+
+def plot_rollout_error_curve(error_curve, title=None, savepath=None):
+    set_plot_style()
+    t = np.arange(len(error_curve))
+
+    plt.figure()
+    plt.plot(t, error_curve, marker="o")
+    plt.xlabel("Rollout step")
+    plt.ylabel("Relative $L^2$ error")
+    if title:
+        plt.title(title)
+
+    _finalize_plot(savepath)
+
+
 
 # ============================================================
 # Global plotting style
@@ -101,9 +178,12 @@ def plot_resolution_vs_spectral_energy(results, title=None):
 # Spectral diagnostics
 # ============================================================
 
-def plot_spectral_error(evaluation, title=None):
+def plot_spectral_error(evaluation, title=None, savepath=None):
     """
-    Plot spectral error curve for a single evaluation output.
+    Plot Fourier-domain distribution of prediction error energy.
+
+    The plotted quantity is the normalized spectral error energy,
+    i.e. the fraction of total error energy at each frequency.
     """
     if not _has_spectral(evaluation):
         raise ValueError("No spectral data present.")
@@ -111,19 +191,30 @@ def plot_spectral_error(evaluation, title=None):
     set_plot_style()
     spec = evaluation["spectral"]
 
+    # Treat stored values as per-frequency error magnitudes
+    err = np.asarray(spec["errors"], dtype=np.float64)
+
+    # Convert to energy and normalize
+    err_energy = err**2
+    total = err_energy.sum()
+    if total > 0:
+        err_energy /= total
+
     plt.figure()
     if "freqs" in spec:
-        plt.plot(spec["freqs"], spec["errors"], marker="o")
+        plt.plot(spec["freqs"], err_energy, marker="o")
         plt.xlabel("Frequency")
     else:
-        plt.plot(spec["radii"], spec["errors"], marker="o")
+        plt.plot(spec["radii"], err_energy, marker="o")
         plt.xlabel("Radial frequency")
 
-    plt.ylabel("Relative spectral error")
+    plt.ylabel("Fraction of total error energy")
     if title:
         plt.title(title)
-    plt.tight_layout()
-    plt.show()
+
+    _finalize_plot(savepath)
+
+
 
 
 def plot_multiple_spectral_curves(curves, labels, title=None):
