@@ -28,6 +28,6 @@ instabilities that are invisible to standard one-step accuracy metrics.
 Experiments can be reproduced by running:
 
 ```bash
-python run_many_seeds.py --iters <# of seeds to test>
+python run_many_seeds.py --iters (# of seeds to test)
 ```
 
