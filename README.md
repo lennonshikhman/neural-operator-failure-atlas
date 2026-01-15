@@ -1,7 +1,7 @@
 # Neural Operator Failure Atlas
 
 This repository contains the experimental code for  
-**“Forcing and Diagnosing Failure Modes of Neural Operators Across Diverse PDE Classes.”**
+**“Forcing and Diagnosing Failure Modes of Fourier Neural Operators Across Diverse PDE Classes.”**
 
 Rather than benchmarking accuracy, this work systematically induces and diagnoses failure
 modes of neural operators under controlled violations of modeling assumptions.
@@ -28,6 +28,6 @@ instabilities that are invisible to standard one-step accuracy metrics.
 Experiments can be reproduced by running:
 
 ```bash
-python run.py
+python run_many_seeds.py --iters <# of seeds to test>
 ```
 
