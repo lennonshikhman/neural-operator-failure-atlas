@@ -1,11 +1,6 @@
 # Neural Operator Robustness Evaluation Framework
 
-This repository contains the experimental framework for stress-testing **neural PDE solver architectures** under deployment-relevant distribution shifts.
-
-The project is now framed as a **robustness evaluation framework** rather than an FNO-only benchmark:
-- FNO is supported as the canonical reference system.
-- A lightweight DeepONet-style baseline is included for architecture comparison.
-- A convolutional neural operator baseline (`cno`) is included for cross-architecture robustness comparisons.
+This repository contains the experimental framework for stress-testing **neural PDE solver architectures** under deployment-relevant distribution shifts. The project is robustness evaluation framework.
 
 ## PDE Families
 - Poisson (elliptic)
@@ -33,9 +28,9 @@ The analysis pipeline reports:
 Run multi-seed sweeps by architecture:
 
 ```bash
-python run_many_seeds.py --model fno --iters 10
-python run_many_seeds.py --model deeponet --iters 10
-python run_many_seeds.py --model cno --iters 10
+python run_many_seeds.py --model fno --iters 50
+python run_many_seeds.py --model deeponet --iters 50
+python run_many_seeds.py --model cno --iters 50
 ```
 
 Then aggregate results:
