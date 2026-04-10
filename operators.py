@@ -14,7 +14,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -356,6 +356,236 @@ def make_fno(
     if dim == 2:
         return FNO2D(cfg)
     raise ValueError("dim must be 1 or 2")
+
+
+# ============================================================
+# DeepONet-style lightweight baselines (resolution-agnostic)
+# ============================================================
+
+class MLP(nn.Module):
+    def __init__(self, in_dim: int, hidden: int, out_dim: int, depth: int = 2):
+        super().__init__()
+        layers = [nn.Linear(in_dim, hidden), nn.GELU()]
+        for _ in range(max(depth - 1, 0)):
+            layers.extend([nn.Linear(hidden, hidden), nn.GELU()])
+        layers.append(nn.Linear(hidden, out_dim))
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.net(x)
+
+
+class DeepONetLite1D(nn.Module):
+    """
+    Lightweight DeepONet-style operator:
+      - branch: global pooled input summary -> latent code
+      - trunk: pointwise local features (with coords) -> latent basis
+      - output: dot(branch, trunk(point)) projected to channels
+    """
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        width: int = 128,
+        latent_dim: int = 64,
+        use_coords: bool = True,
+    ):
+        super().__init__()
+        self.use_coords = use_coords
+        self.branch = MLP(in_channels, width, latent_dim, depth=2)
+        trunk_in = in_channels + (1 if use_coords else 0)
+        self.trunk = MLP(trunk_in, width, latent_dim, depth=2)
+        self.head = nn.Linear(latent_dim, out_channels)
+
+    def forward(self, x: Tensor) -> Tensor:
+        _assert_shape(x.ndim == 3, "DeepONetLite1D expects (B, N, C_in).")
+        g = x.mean(dim=1)  # (B, C_in)
+        b = self.branch(g)  # (B, latent)
+        xl = add_coords_1d(x) if self.use_coords else x
+        t = self.trunk(xl)  # (B, N, latent)
+        z = t * b[:, None, :]
+        return self.head(z)
+
+
+class DeepONetLite2D(nn.Module):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        width: int = 128,
+        latent_dim: int = 64,
+        use_coords: bool = True,
+    ):
+        super().__init__()
+        self.use_coords = use_coords
+        self.branch = MLP(in_channels, width, latent_dim, depth=2)
+        trunk_in = in_channels + (2 if use_coords else 0)
+        self.trunk = MLP(trunk_in, width, latent_dim, depth=2)
+        self.head = nn.Linear(latent_dim, out_channels)
+
+    def forward(self, x: Tensor) -> Tensor:
+        _assert_shape(x.ndim == 4, "DeepONetLite2D expects (B, H, W, C_in).")
+        g = x.mean(dim=(1, 2))  # (B, C_in)
+        b = self.branch(g)      # (B, latent)
+        xl = add_coords_2d(x) if self.use_coords else x
+        t = self.trunk(xl)      # (B, H, W, latent)
+        z = t * b[:, None, None, :]
+        return self.head(z)
+
+
+def make_deeponet_lite(
+    dim: int,
+    in_channels: int,
+    out_channels: int,
+    width: int = 128,
+    latent_dim: int = 64,
+    use_coords: bool = True,
+) -> nn.Module:
+    if dim == 1:
+        return DeepONetLite1D(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            width=width,
+            latent_dim=latent_dim,
+            use_coords=use_coords,
+        )
+    if dim == 2:
+        return DeepONetLite2D(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            width=width,
+            latent_dim=latent_dim,
+            use_coords=use_coords,
+        )
+    raise ValueError("dim must be 1 or 2")
+
+
+class CNOBlock1D(nn.Module):
+    def __init__(self, width: int):
+        super().__init__()
+        self.conv = nn.Conv1d(width, width, kernel_size=5, padding=2)
+        self.norm = nn.BatchNorm1d(width)
+
+    def forward(self, x: Tensor) -> Tensor:
+        return F.gelu(self.norm(self.conv(x)))
+
+
+class CNOBlock2D(nn.Module):
+    def __init__(self, width: int):
+        super().__init__()
+        self.conv = nn.Conv2d(width, width, kernel_size=5, padding=2)
+        self.norm = nn.BatchNorm2d(width)
+
+    def forward(self, x: Tensor) -> Tensor:
+        return F.gelu(self.norm(self.conv(x)))
+
+
+class CNO1D(nn.Module):
+    """
+    Lightweight convolutional neural operator baseline for 1D grids.
+    """
+    def __init__(self, in_channels: int, out_channels: int, width: int = 64, depth: int = 4, use_coords: bool = True):
+        super().__init__()
+        self.use_coords = use_coords
+        c_in = in_channels + (1 if use_coords else 0)
+        self.lift = nn.Conv1d(c_in, width, kernel_size=1)
+        self.blocks = nn.ModuleList([CNOBlock1D(width) for _ in range(depth)])
+        self.proj = nn.Conv1d(width, out_channels, kernel_size=1)
+
+    def forward(self, x: Tensor) -> Tensor:
+        _assert_shape(x.ndim == 3, "CNO1D expects (B, N, C_in).")
+        if self.use_coords:
+            x = add_coords_1d(x)
+        x = x.permute(0, 2, 1).contiguous()  # (B, C, N)
+        x = self.lift(x)
+        for blk in self.blocks:
+            x = blk(x)
+        x = self.proj(x)
+        return x.permute(0, 2, 1).contiguous()
+
+
+class CNO2D(nn.Module):
+    """
+    Lightweight convolutional neural operator baseline for 2D grids.
+    """
+    def __init__(self, in_channels: int, out_channels: int, width: int = 64, depth: int = 4, use_coords: bool = True):
+        super().__init__()
+        self.use_coords = use_coords
+        c_in = in_channels + (2 if use_coords else 0)
+        self.lift = nn.Conv2d(c_in, width, kernel_size=1)
+        self.blocks = nn.ModuleList([CNOBlock2D(width) for _ in range(depth)])
+        self.proj = nn.Conv2d(width, out_channels, kernel_size=1)
+
+    def forward(self, x: Tensor) -> Tensor:
+        _assert_shape(x.ndim == 4, "CNO2D expects (B, H, W, C_in).")
+        if self.use_coords:
+            x = add_coords_2d(x)
+        x = x.permute(0, 3, 1, 2).contiguous()  # (B, C, H, W)
+        x = self.lift(x)
+        for blk in self.blocks:
+            x = blk(x)
+        x = self.proj(x)
+        return x.permute(0, 2, 3, 1).contiguous()
+
+
+def make_cno(
+    dim: int,
+    in_channels: int,
+    out_channels: int,
+    width: int = 64,
+    depth: int = 4,
+    use_coords: bool = True,
+) -> nn.Module:
+    if dim == 1:
+        return CNO1D(in_channels, out_channels, width=width, depth=depth, use_coords=use_coords)
+    if dim == 2:
+        return CNO2D(in_channels, out_channels, width=width, depth=depth, use_coords=use_coords)
+    raise ValueError("dim must be 1 or 2")
+
+
+def make_model(
+    model_name: str,
+    *,
+    dim: int,
+    in_channels: int,
+    out_channels: int,
+    width: int = 64,
+    depth: int = 4,
+    modes1: int = 16,
+    modes2: Optional[int] = None,
+    use_coords: bool = True,
+) -> nn.Module:
+    name = model_name.lower()
+    if name == "fno":
+        return make_fno(
+            dim=dim,
+            in_channels=in_channels,
+            out_channels=out_channels,
+            width=width,
+            depth=depth,
+            modes1=modes1,
+            modes2=modes2,
+            use_coords=use_coords,
+        )
+    if name in {"deeponet", "deeponet_lite"}:
+        return make_deeponet_lite(
+            dim=dim,
+            in_channels=in_channels,
+            out_channels=out_channels,
+            width=max(width, 64),
+            latent_dim=max(width, 64),
+            use_coords=use_coords,
+        )
+    if name == "cno":
+        return make_cno(
+            dim=dim,
+            in_channels=in_channels,
+            out_channels=out_channels,
+            width=width,
+            depth=depth,
+            use_coords=use_coords,
+        )
+    raise ValueError(f"Unknown model '{model_name}'.")
 
 
 # ============================================================
