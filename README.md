@@ -1,6 +1,6 @@
 # Neural Operator Robustness Evaluation Framework
 
-This repository contains the experimental framework for stress-testing **neural PDE solver architectures** under deployment-relevant distribution shifts. The project is robustness evaluation framework.
+This repository contains the experimental framework for stress-testing neural PDE solver architectures under deployment-relevant distribution shifts. The project is a robustness evaluation framework.
 
 ## PDE Families
 - Poisson (elliptic)
