@@ -171,12 +171,14 @@ The generated CSV files and PDF figures can then be found in `analysis/` and `pa
 If you use this repository or build on the associated paper, please cite:
 
 ```bibtex
-@article{shikhman2026failuremodes,
-  title={Diagnosing Failure Modes of Fourier Neural Operators Across Diverse {PDE} Families},
-  author={Shikhman, Lennon},
+@article{shikhman2026diagnosing,
+  title={Diagnosing Failure Modes of Neural Operators Across Diverse {PDE} Families},
+  author={Lennon Shikhman},
   journal={Transactions on Machine Learning Research},
+  issn={2835-8856},
   year={2026},
-  url={https://openreview.net/forum?id=0S1LWZHQYn}
+  url={https://openreview.net/forum?id=0S1LWZHQYn},
+  note={}
 }
 ```
 
