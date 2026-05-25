@@ -62,13 +62,28 @@ The analysis pipeline reports several diagnostics beyond a single degradation sc
 
 Together, these metrics are intended to separate mild accuracy degradation from structurally meaningful failure modes.
 
+## Repository Contents
+
+The main repository files are organized as a lightweight Python research codebase:
+
+- `run_many_seeds.py`: runs multi-seed robustness sweeps by model architecture
+- `analyze_distributions.py`: aggregates experiment outputs into summary tables and cross-PDE degradation matrices
+- `data.py`: data generation and loading utilities
+- `pdes.py`: PDE-family definitions
+- `operators.py`: neural operator model definitions
+- `train.py`: training utilities
+- `eval.py`: evaluation utilities
+- `metrics.py`: robustness and error metrics
+- `stress.py`: distribution-shift and stress-test utilities
+- `plots.py` and `plot_distributions.py`: plotting and visualization scripts
+
 ## Installation
 
 Clone the repository:
 
 ```bash
-git clone <repository-url>
-cd <repository-name>
+git clone https://github.com/lennonshikhman/neural-operator-failure-atlas.git
+cd neural-operator-failure-atlas
 ```
 
 Create and activate a Python environment. For example, with `conda`:
@@ -78,17 +93,13 @@ conda create -n neural-operator-robustness python=3.10
 conda activate neural-operator-robustness
 ```
 
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-If no `requirements.txt` is provided, install the core scientific Python stack used by the experiments:
+Install the core scientific Python dependencies:
 
 ```bash
 pip install numpy scipy pandas matplotlib torch tqdm
 ```
+
+A GPU-enabled PyTorch installation is recommended for larger sweeps. If you need a CUDA-specific PyTorch build, install PyTorch using the command recommended for your system by the official PyTorch installation selector.
 
 ## Running Experiments
 
@@ -100,7 +111,7 @@ python run_many_seeds.py --model deeponet --iters 50
 python run_many_seeds.py --model cno --iters 50
 ```
 
-The `--model` argument selects the architecture to evaluate. The `--iters` argument controls the number of training iterations used in the sweep.
+The `--model` argument selects the architecture to evaluate. The `--iters` argument controls the number of random seeds in the sweep.
 
 For the main FNO experiments from the paper, run:
 
@@ -171,6 +182,4 @@ If you use this repository or build on the associated paper, please cite:
 
 ## Contact
 
-For questions about the paper or repository, please contact:
-
-**Lennon Shikhman**
+For questions about the paper or repository, please contact Lennon Shikhman or open an issue on GitHub.
