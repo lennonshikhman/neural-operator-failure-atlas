@@ -2,7 +2,7 @@
 
 This repository contains the experimental framework for the TMLR 2026 paper:
 
-**Diagnosing Failure Modes of Fourier Neural Operators Across Diverse PDE Families**  
+**Diagnosing Failure Modes of Neural Operators Across Diverse PDE Families**  
 Lennon Shikhman  
 *Transactions on Machine Learning Research*, 2026  
 OpenReview: https://openreview.net/forum?id=0S1LWZHQYn
